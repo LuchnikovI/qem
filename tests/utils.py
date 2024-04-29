@@ -54,7 +54,9 @@ class QuantumStateTest:
         assert pos >= 0
         assert pos < self._qubits_number
         state = self._state.reshape(self._qubits_number * (2,))
-        state = np.transpose(state, (pos, *filter(lambda x: x != pos, range(self._qubits_number))))
+        state = np.transpose(
+            state, (pos, *filter(lambda x: x != pos, range(self._qubits_number)))
+        )
         state = state.reshape((2, -1))
         dens = np.tensordot(state, state.conj(), axes=((1), (1)))
         return dens
@@ -65,7 +67,13 @@ class QuantumStateTest:
         assert pos1 != pos2
         assert pos1 < self._qubits_number
         assert pos2 < self._qubits_number
-        state = self._state.reshape((pos1, pos2, *filter(lambda x: x != pos1 & x != pos2, range(self._qubits_number))))
+        state = self._state.reshape(
+            (
+                pos1,
+                pos2,
+                *filter(lambda x: x != pos1 & x != pos2, range(self._qubits_number)),
+            )
+        )
         state = state.reshape((2, 2, -1))
         dens = np.tensordot(state, state.conj(), axes=((2), (2)))
         return dens
@@ -83,7 +91,9 @@ class QuantumStateTest:
     def reset(self, pos: int, uniform_sample: NDArray) -> None:
         result = self.measure(pos, uniform_sample)
         if result == 1:
-            self.apply1(pos, np.array([0, 1, 1, 0], dtype=np.complex128).reshape((2, 2)))
+            self.apply1(
+                pos, np.array([0, 1, 1, 0], dtype=np.complex128).reshape((2, 2))
+            )
 
     def total_reset(self) -> None:
         self._state = np.zeros(2**self._qubits_number, dtype=np.complex128)
@@ -101,7 +111,7 @@ def array2state_test(array: NDArray) -> QuantumStateTest:
     assert len(array.shape) == 1
     size = array.shape[0]
     qubits_number = int(log2(size))
-    assert size == 2 ** qubits_number
+    assert size == 2**qubits_number
     state = QuantumStateTest(qubits_number)
     state._state = array
     return state
