@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "qem"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+authors = [
+  { name = "Ilia Luchnikov", email = "ilia.luchnikov@tii.ae" }
+]
+
+dependencies = [
+  "numpy",
+]
