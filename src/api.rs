@@ -68,7 +68,9 @@ pub struct QuantumState {
 #[pyo3(signature = (array,))]
 pub fn array2state(array: Bound<PyArray1<Complex64>>) -> PyResult<QuantumState> {
     if !array.is_c_contiguous() {
-        return Err(PyValueError::new_err(format!("Array must be C contiguous")));
+        return Err(PyValueError::new_err(
+            "Array must be C contiguous".to_string(),
+        ));
     }
     let size = array.shape()[0];
     let qubits_number = get_qubits_number(size);
@@ -89,7 +91,7 @@ impl QuantumState {
     ///     qubits_number: a number of qubits.
     #[new]
     #[pyo3(signature = (qubits_number,))]
-    fn new<'py>(py: Python<'py>, qubits_number: u32) -> Self {
+    fn new(py: Python<'_>, qubits_number: u32) -> Self {
         let size = 1 << qubits_number;
         let array = unsafe { PyArray1::<Complex64>::new_bound(py, [size], false) };
         let ptr = UnsafeSyncSendPtr(unsafe { array.uget_raw(0) });
@@ -112,9 +114,9 @@ impl QuantumState {
     ///         2) if `gate` has shape different to (2, 2);
     ///         3) if elements of `gate` have type different to `np.complex128`.
     #[pyo3(signature = (pos, gate,))]
-    fn apply1<'py>(
+    fn apply1(
         &mut self,
-        py: Python<'py>,
+        py: Python<'_>,
         pos: usize,
         gate: Bound<PyArray2<Complex64>>,
     ) -> PyResult<()> {
@@ -168,9 +170,9 @@ impl QuantumState {
     ///         2) if `gate` has shape different to (2, 2, 2, 2);
     ///         3) if elements of `gate` have type different to `np.complex128`.
     #[pyo3(signature = (pos1, pos2, gate,))]
-    fn apply2<'py>(
+    fn apply2(
         &mut self,
-        py: Python<'py>,
+        py: Python<'_>,
         pos1: usize,
         pos2: usize,
         gate: Bound<PyArray4<Complex64>>,
@@ -452,9 +454,9 @@ impl QuantumState {
     ///         2) if `uniform_sample` has 0 or > 1 elements;
     ///         3) if type of element in `uniform_sample` is not `np.float64`.
     #[pyo3(signature = (pos, uniform_sample,))]
-    fn measure<'py>(
+    fn measure(
         &mut self,
-        py: Python<'py>,
+        py: Python<'_>,
         pos: usize,
         uniform_sample: Bound<PyArray1<f64>>,
     ) -> PyResult<u8> {
@@ -518,9 +520,9 @@ impl QuantumState {
     ///         2) if `uniform_sample` has 0 or > 1 elements;
     ///         3) if type of element in `uniform_sample` is not `np.float64`.
     #[pyo3(signature = (pos, uniform_sample,))]
-    fn reset<'py>(
+    fn reset(
         &mut self,
-        py: Python<'py>,
+        py: Python<'_>,
         pos: usize,
         uniform_sample: Bound<PyArray1<f64>>,
     ) -> PyResult<()> {
@@ -581,7 +583,7 @@ impl QuantumState {
     }
     /// Resets all qubits to `0` state.
     #[pyo3(signature = ())]
-    fn total_reset<'py>(&mut self, py: Python<'py>) {
+    fn total_reset(&mut self, py: Python<'_>) {
         let size = 1 << self.qubits_number;
         let ptr = UnsafeSyncSendPtr(unsafe { self.state.bind(py).uget_raw(0) });
         (1..size).into_par_iter().for_each(|idx| {
@@ -598,6 +600,9 @@ impl QuantumState {
         self.qubits_number
     }
     fn __repr__(&self) -> String {
-        format!("Qubits number: {},\nState array: {}", self.qubits_number, self.state)
+        format!(
+            "Qubits number: {},\nState array: {}",
+            self.qubits_number, self.state
+        )
     }
 }

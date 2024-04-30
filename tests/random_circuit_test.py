@@ -71,14 +71,18 @@ def test(
         test_result = test_state.measure(i, sample)
         qem_result = qem_state.measure(i, sample)
         assert test_result == qem_result, f"{test_result}, {qem_result}"
-    assert np.isclose(np.linalg.norm(qem_state.state_array), 1.0), f"{np.linalg.norm(qem_state.state_array)}"
+    assert np.isclose(
+        np.linalg.norm(qem_state.state_array), 1.0
+    ), f"{np.linalg.norm(qem_state.state_array)}"
     assert np.isclose(test_state.state_array, qem_state.state_array).all()
     print("\tMeasurements: OK")
     for i in qubits_traverser:
         sample = uniform_sample()
         test_state.reset(i, sample)
         qem_state.reset(i, sample)
-    assert np.isclose(np.linalg.norm(qem_state.state_array), 1.0), f"{np.linalg.norm(qem_state.state_array)}"
+    assert np.isclose(
+        np.linalg.norm(qem_state.state_array), 1.0
+    ), f"{np.linalg.norm(qem_state.state_array)}"
     assert np.isclose(test_state.state_array, qem_state.state_array).all()
     print("\tReset: OK")
 
