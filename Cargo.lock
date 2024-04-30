@@ -266,6 +266,7 @@ name = "qem"
 version = "0.1.0"
 dependencies = [
  "num-complex",
+ "num-traits",
  "numpy",
  "pyo3",
  "rayon",

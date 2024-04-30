@@ -20,10 +20,14 @@ def test(
     gates_number: int,
     two_qubits_dens_number: int,
 ) -> None:
+    print(
+        f"Random circuit test with qubits number: {qubits_number}, gates number: {gates_number}, two-qubit density matrices number {two_qubits_dens_number}"
+    )
     assert np.isclose(
         QuantumState(qubits_number).state_array,
         QuantumStateTest(qubits_number).state_array,
-    )
+    ).all()
+    print("\tStd state: OK")
     state = random_state(qubits_number)
     test_state = array2state_test(state)
     qem_state = array2state(state.copy())
@@ -33,6 +37,7 @@ def test(
     assert (
         qem_state.qubits_number == qubits_number
     ), f"{qem_state.qubits_number}, {qubits_number}"
+    print("\tQubits number: OK")
     for num in range(gates_number):
         if num % 2 == 0:
             pos = random_position(qubits_number)
@@ -44,16 +49,21 @@ def test(
             gate = random_q2_gate()
             test_state.apply2(pos1, pos2, gate)
             qem_state.apply2(pos1, pos2, gate)
+    assert np.isclose(test_state.state_array, qem_state.state_array).all()
+    print("\tState after gates application: OK")
     for i in range(qubits_number):
         arr_dens = test_state.dens1(i)
         qem_dens = qem_state.dens1(i)
-        assert np.isclose(arr_dens, qem_dens), f"{i}, {arr_dens}, {qem_dens}"
+        assert np.isclose(arr_dens, qem_dens).all(), f"{i}, {arr_dens}, {qem_dens}"
     for _ in range(two_qubits_dens_number):
         pos1, pos2 = random_two_positions(qubits_number)
         arr_dens = test_state.dens2(pos1, pos2)
         qem_dens = qem_state.dens2(pos1, pos2)
-        assert np.isclose(arr_dens, qem_dens), f"{pos1}, {pos2}, {arr_dens}, {qem_dens}"
-    assert np.isclose(test_state.state_array, qem_state.state_array)
+        assert np.isclose(
+            arr_dens, qem_dens
+        ).all(), f"{pos1}, {pos2}, {arr_dens}, {qem_dens}"
+    assert np.isclose(test_state.state_array, qem_state.state_array).all()
+    print("\tDensity matrices: OK")
     qubits_traverser = range(qubits_number)
     # half measure, half reset
     for i in takewhile(lambda x: x < qubits_number // 2, qubits_traverser):
@@ -61,12 +71,16 @@ def test(
         test_result = test_state.measure(i, sample)
         qem_result = qem_state.measure(i, sample)
         assert test_result == qem_result, f"{test_result}, {qem_result}"
-    assert np.isclose(test_state.state_array, qem_state.state_array)
+    assert np.isclose(np.linalg.norm(qem_state.state_array), 1.0), f"{np.linalg.norm(qem_state.state_array)}"
+    assert np.isclose(test_state.state_array, qem_state.state_array).all()
+    print("\tMeasurements: OK")
     for i in qubits_traverser:
         sample = uniform_sample()
         test_state.reset(i, sample)
         qem_state.reset(i, sample)
-    assert np.isclose(test_state.state_array, qem_state.state_array)
+    assert np.isclose(np.linalg.norm(qem_state.state_array), 1.0), f"{np.linalg.norm(qem_state.state_array)}"
+    assert np.isclose(test_state.state_array, qem_state.state_array).all()
+    print("\tReset: OK")
 
 
 def main():

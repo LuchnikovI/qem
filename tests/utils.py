@@ -67,11 +67,12 @@ class QuantumStateTest:
         assert pos1 != pos2
         assert pos1 < self._qubits_number
         assert pos2 < self._qubits_number
-        state = self._state.reshape(
+        state = self._state.reshape((2,) * self._qubits_number)
+        state = state.transpose(
             (
                 pos1,
                 pos2,
-                *filter(lambda x: x != pos1 & x != pos2, range(self._qubits_number)),
+                *filter(lambda x: x != pos1 and x != pos2, range(self._qubits_number)),
             )
         )
         state = state.reshape((2, 2, -1))
@@ -80,7 +81,7 @@ class QuantumStateTest:
 
     def measure(self, pos: int, uniform_sample: NDArray) -> int:
         dens = self.dens1(pos)
-        p0 = dens[0].real
+        p0 = dens[0, 0].real
         result = 0 if uniform_sample < p0 else 1
         proj = np.zeros((2, 2), dtype=np.complex128)
         proj[result, result] = 1
@@ -108,7 +109,7 @@ class QuantumStateTest:
 
 
 def array2state_test(array: NDArray) -> QuantumStateTest:
-    assert len(array.shape) == 1
+    assert len(array.shape) == 1, f"{array.shape}"
     size = array.shape[0]
     qubits_number = int(log2(size))
     assert size == 2**qubits_number
@@ -118,14 +119,14 @@ def array2state_test(array: NDArray) -> QuantumStateTest:
 
 
 def random_q1_gate() -> NDArray:
-    gate = np.random.normal((2, 2, 2))
+    gate = np.random.normal(size=(2, 2, 2))
     gate = gate[..., 0] + 1j * gate[..., 1]
     gate, _ = np.linalg.qr(gate)
     return gate
 
 
 def random_q2_gate() -> NDArray:
-    gate = np.random.normal((4, 4, 2))
+    gate = np.random.normal(size=(4, 4, 2))
     gate = gate[..., 0] + 1j * gate[..., 1]
     gate, _ = np.linalg.qr(gate)
     gate = gate.reshape((2, 2, 2, 2))
@@ -134,8 +135,8 @@ def random_q2_gate() -> NDArray:
 
 def random_state(qubits_number: int) -> NDArray:
     size = 2**qubits_number
-    state = np.random.normal((size, 2))
-    state = state[..., 0] + 1j * state[..., 1]
+    state = np.random.normal(size=(size, 2))
+    state = state[:, 0] + 1j * state[:, 1]
     state /= np.linalg.norm(state)
     return state
 
@@ -150,7 +151,7 @@ def random_two_positions(qubits_number) -> Tuple[int, int]:
     if pos1 == pos2:
         if pos1 == 0:
             pos1 += 1
-        elif pos1 == qubits_number - 1:
+        else:
             pos1 -= 1
     assert pos1 != pos2
     assert pos1 >= 0
