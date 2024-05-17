@@ -3,6 +3,7 @@ use pyo3::{pymodule, wrap_pyfunction, Bound, PyResult};
 
 mod api;
 mod ptrwrap;
+mod utils;
 
 #[pymodule]
 fn qem(m: &Bound<'_, PyModule>) -> PyResult<()> {

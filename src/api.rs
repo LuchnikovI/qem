@@ -1,44 +1,19 @@
+use std::collections::HashSet;
+
 use crate::ptrwrap::UnsafeSyncSendPtr;
+use crate::utils::*;
 use num_complex::Complex64;
 use num_traits::{One, Zero};
-use numpy::{PyArray1, PyArray2, PyArray4, PyArrayMethods, PyUntypedArrayMethods};
+use numpy::{PyArray1, PyArray2, PyArray4, PyArrayDyn, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::{
     exceptions::PyValueError,
     prelude::{pyclass, pymethods, Bound, Py, Python},
-    pyfunction, PyResult,
+    pyfunction,
+    types::{PyAnyMethods, PyTuple},
+    PyResult,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::{current_num_threads, scope};
-
-#[inline(always)]
-fn get_qubits_number(size: usize) -> u32 {
-    size.ilog2()
-}
-
-#[inline(always)]
-fn pos_fortran2c(qubits_number: u32, pos: usize) -> usize {
-    qubits_number as usize - pos - 1
-}
-
-#[inline(always)]
-fn get_left_mask(pos: usize) -> usize {
-    usize::MAX << pos
-}
-
-#[inline(always)]
-fn get_right_mask(pos: usize) -> usize {
-    !get_left_mask(pos)
-}
-
-#[inline(always)]
-fn insert_zero_bit(number: usize, left_mask: usize, right_mask: usize) -> usize {
-    ((number & left_mask) << 1) | (number & right_mask)
-}
-
-#[inline(always)]
-fn get_stride(pos: usize) -> usize {
-    1 << pos
-}
 
 // TODO: reduce code repetition
 
@@ -291,11 +266,7 @@ impl QuantumState {
         let stride = get_stride(pos);
         let state_ptr = unsafe { UnsafeSyncSendPtr(self.state.bind(py).uget_mut(0)) };
         let threads_number = current_num_threads();
-        let task_size = if batch_size % threads_number == 0 {
-            batch_size / threads_number
-        } else {
-            batch_size / threads_number + 1
-        };
+        let task_size = get_task_size(batch_size, threads_number);
         let mut density_matrices = vec![[Complex64::zero(); 4]; threads_number];
         scope(|s| {
             for (task_id, density_matrix) in (0..threads_number).zip(&mut density_matrices) {
@@ -339,6 +310,8 @@ impl QuantumState {
     ///     pos1: position of a first qubit;
     ///     pos2: position of a second qubit.
     /// Returns:
+    ///     array of rank 4 representing a density matrix.
+    /// Notes:
     ///     it raises an error in the following cases:
     ///         1) if `pos1` or `pos2` is out of bound;
     ///         2) if `pos1` == `pos2`.
@@ -379,11 +352,7 @@ impl QuantumState {
         let stride0 = get_stride(pos2);
         let state_ptr = unsafe { UnsafeSyncSendPtr(self.state.bind(py).uget_mut(0)) };
         let threads_number = current_num_threads();
-        let task_size = if batch_size % threads_number == 0 {
-            batch_size / threads_number
-        } else {
-            batch_size / threads_number + 1
-        };
+        let task_size = get_task_size(batch_size, threads_number);
         let mut density_matrices = vec![[Complex64::zero(); 16]; threads_number];
         scope(|s| {
             for (task_id, density_matrix) in (0..threads_number).zip(&mut density_matrices) {
@@ -472,11 +441,7 @@ impl QuantumState {
         let right_mask = get_right_mask(pos);
         let state_ptr = unsafe { UnsafeSyncSendPtr(self.state.bind(py).uget_mut(0)) };
         let threads_number = current_num_threads();
-        let task_size = if batch_size % threads_number == 0 {
-            batch_size / threads_number
-        } else {
-            batch_size / threads_number + 1
-        };
+        let task_size = get_task_size(batch_size, threads_number);
         let mut probabilities = vec![0f64; threads_number];
         scope(|s| {
             for (task_id, probability) in (0..threads_number).zip(&mut probabilities) {
@@ -538,11 +503,7 @@ impl QuantumState {
         let right_mask = get_right_mask(pos);
         let state_ptr = unsafe { UnsafeSyncSendPtr(self.state.bind(py).uget_mut(0)) };
         let threads_number = current_num_threads();
-        let task_size = if batch_size % threads_number == 0 {
-            batch_size / threads_number
-        } else {
-            batch_size / threads_number + 1
-        };
+        let task_size = get_task_size(batch_size, threads_number);
         let mut probabilities = vec![0f64; threads_number];
         scope(|s| {
             for (task_id, probability) in (0..threads_number).zip(&mut probabilities) {
@@ -590,6 +551,78 @@ impl QuantumState {
             unsafe { *ptr.add(idx) = Complex64::zero() };
         });
         unsafe { *ptr.add(0) = Complex64::one() };
+    }
+    /// Returns a density matrix of an arbitrary subset of qubits.
+    /// Args:
+    ///     qubit_positions: positions of qubits.
+    /// Returns:
+    ///     array of rank 2 * len(qubits_position) representing a density matrix.
+    /// Notes:
+    ///     this routine is for computing of large partial density matrices,
+    ///     do not use it to compute one- or two-qubits partial density matrix,
+    ///     since it would be slow;
+    ///     it raises an error in the following cases:
+    ///         1) if one or more positions are out of bound;
+    ///         2) if some positions are equal to each other.
+    #[pyo3(signature = (qubit_positions,))]
+    fn dens_large<'py>(
+        &self,
+        py: Python<'py>,
+        qubit_positions: Bound<'py, PyTuple>,
+    ) -> PyResult<Bound<'py, PyArrayDyn<Complex64>>> {
+        let qubit_positions = qubit_positions
+            .into_iter()
+            .rev()
+            .map(|pos| {
+                pos.extract::<usize>()
+                    .map(|pos| pos_fortran2c(self.qubits_number, pos))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let positions_number = qubit_positions.len();
+        let mut seen_positions = HashSet::with_capacity(positions_number);
+        for pos in &qubit_positions {
+            if !seen_positions.insert(*pos) {
+                return Err(PyValueError::new_err(format!(
+                    "Position {pos} appears more than once"
+                )));
+            }
+            if *pos as u32 >= self.qubits_number {
+                return Err(PyValueError::new_err(format!(
+                    "Position {pos} is out of bound of state consisting of {} qubits",
+                    self.qubits_number
+                )));
+            }
+        }
+        let mut sorted_qubits_positions = qubit_positions.clone();
+        sorted_qubits_positions.sort();
+        let left_masks = get_left_masks(&sorted_qubits_positions);
+        let right_masks = get_right_masks(&sorted_qubits_positions);
+        let strides = get_strides(&qubit_positions);
+        let batch_size = 1 << (self.qubits_number - positions_number as u32);
+        let dens_size = 1 << positions_number;
+        let state_ptr = unsafe { UnsafeSyncSendPtr(self.state.bind(py).uget_mut(0)) };
+        let density_matrix =
+            unsafe { PyArrayDyn::<Complex64>::new_bound(py, vec![2; 2 * positions_number], false) };
+        let density_matrix_ptr =
+            unsafe { UnsafeSyncSendPtr(density_matrix.uget_raw(vec![0; 2 * positions_number])) };
+        (0..dens_size).into_par_iter().for_each(|row_number| {
+            (0..dens_size).into_par_iter().for_each(|col_number| {
+                let density_matrix_ptr =
+                    unsafe { density_matrix_ptr.add(col_number + row_number * dens_size) };
+                unsafe { *density_matrix_ptr = Complex64::zero() };
+                let row_number = dens_idx2state_idx(row_number, &strides);
+                let col_number = dens_idx2state_idx(col_number, &strides);
+                for bidx in 0..batch_size {
+                    let bidx = insert_zero_bits(bidx, &left_masks, &right_masks);
+                    unsafe {
+                        let rhs = *state_ptr.add(bidx + col_number);
+                        let lhs = *state_ptr.add(bidx + row_number);
+                        *density_matrix_ptr += lhs * rhs.conj();
+                    }
+                }
+            })
+        });
+        Ok(density_matrix)
     }
     #[getter]
     fn state_array<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<Complex64>> {

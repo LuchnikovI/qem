@@ -79,6 +79,20 @@ class QuantumStateTest:
         dens = np.tensordot(state, state.conj(), axes=((2), (2)))
         return dens
 
+    def dens_large(self, qubit_positions: Tuple[int, ...]) -> NDArray:
+        positions_number = len(qubit_positions)
+        state_array = self.state_array.reshape(self.qubits_number * [2])
+        state_array = state_array.transpose(
+            qubit_positions
+            + tuple(
+                filter(lambda x: x not in qubit_positions, range(self.qubits_number))
+            )
+        )
+        state_array = state_array.reshape(
+            len(qubit_positions) * [2] + [2 ** (self.qubits_number - positions_number)]
+        )
+        return np.tensordot(state_array, state_array.conj(), axes=((-1,), (-1,)))
+
     def measure(self, pos: int, uniform_sample: NDArray) -> int:
         dens = self.dens1(pos)
         p0 = dens[0, 0].real

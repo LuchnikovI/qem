@@ -51,6 +51,11 @@ def test(
             qem_state.apply2(pos1, pos2, gate)
     assert np.isclose(test_state.state_array, qem_state.state_array).all()
     print("\tState after gates application: OK")
+    if qubits_number > 10:
+        qem_large_dens = qem_state.dens_large((5, 7, 3, 6, 0))
+        test_large_dens = test_state.dens_large((5, 7, 3, 6, 0))
+        assert np.isclose(qem_large_dens, test_large_dens).all()
+        print("\tBig density matrices: OK")
     for i in range(qubits_number):
         arr_dens = test_state.dens1(i)
         qem_dens = qem_state.dens1(i)
