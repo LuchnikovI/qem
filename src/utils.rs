@@ -57,7 +57,7 @@ pub(super) fn get_strides(positions: &[usize]) -> Vec<usize> {
 
 #[inline(always)]
 pub(super) fn get_task_size(batch_size: usize, threads_number: usize) -> usize {
-    if batch_size % threads_number == 0 {
+    if batch_size.is_multiple_of(threads_number) {
         batch_size / threads_number
     } else {
         batch_size / threads_number + 1

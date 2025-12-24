@@ -18,7 +18,7 @@ use rayon::{current_num_threads, scope};
 // TODO: reduce code repetition
 
 /// Quantum state class.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[pyclass]
 pub struct QuantumState {
     state: Py<PyArray1<Complex64>>,
@@ -68,7 +68,7 @@ impl QuantumState {
     #[pyo3(signature = (qubits_number,))]
     fn new(py: Python<'_>, qubits_number: u32) -> Self {
         let size = 1 << qubits_number;
-        let array = unsafe { PyArray1::<Complex64>::new_bound(py, [size], false) };
+        let array = unsafe { PyArray1::<Complex64>::new(py, [size], false) };
         let ptr = UnsafeSyncSendPtr(unsafe { array.uget_raw(0) });
         (1..size).into_par_iter().for_each(|idx| {
             unsafe { *ptr.add(idx) = Complex64::zero() };
@@ -289,7 +289,7 @@ impl QuantumState {
                 })
             }
         });
-        let density_matrix = unsafe { PyArray2::<Complex64>::new_bound(py, [2, 2], false) };
+        let density_matrix = unsafe { PyArray2::<Complex64>::new(py, [2, 2], false) };
         let density_matrix_ptr = unsafe { density_matrix.uget_raw([0, 0]) };
         for i in 0..4 {
             unsafe {
@@ -394,7 +394,7 @@ impl QuantumState {
                 })
             }
         });
-        let density_matrix = unsafe { PyArray4::<Complex64>::new_bound(py, [2, 2, 2, 2], false) };
+        let density_matrix = unsafe { PyArray4::<Complex64>::new(py, [2, 2, 2, 2], false) };
         let density_matrix_ptr = unsafe { density_matrix.uget_raw([0, 0, 0, 0]) };
         for i in 0..16 {
             unsafe {
@@ -602,7 +602,7 @@ impl QuantumState {
         let dens_size = 1 << positions_number;
         let state_ptr = unsafe { UnsafeSyncSendPtr(self.state.bind(py).uget_mut(0)) };
         let density_matrix =
-            unsafe { PyArrayDyn::<Complex64>::new_bound(py, vec![2; 2 * positions_number], false) };
+            unsafe { PyArrayDyn::<Complex64>::new(py, vec![2; 2 * positions_number], false) };
         let density_matrix_ptr =
             unsafe { UnsafeSyncSendPtr(density_matrix.uget_raw(vec![0; 2 * positions_number])) };
         (0..dens_size).into_par_iter().for_each(|row_number| {
